@@ -17,8 +17,7 @@ skim(data)
 data[5,4]<-19.98
 
 
-# Assuming your dataset is named 'data'
-# Get the column indices for the range of columns to be converted
+
 start_col <- 3
 end_col <- ncol(data) - 2
 column_indices <- start_col:end_col
@@ -30,8 +29,8 @@ data%>%ggpairs()
   
 library(tidymodels)
 #For the knn model
-#first run
-#1. Impute missing values by mean
+
+#1. Impute missing values by median
 
 median_impute <- function(data) {
   for (col in names(data)) {
@@ -84,7 +83,7 @@ can_wkf<-workflow()%>%add_recipe(can_rec)%>%add_model(can_mod) #knn
 
 #
 set.seed(1234)
-can_grid<-tibble(neighbors=seq(from=1,to=60,by=3)) #use small numbers like 1,3,5,7,9,12
+can_grid<-tibble(neighbors=seq(from=1,to=60,by=3)) 
 
 set.seed(123456)
 can_results<-can_wkf%>%tune_grid(resamples = can_vfold,grid = can_grid)%>%collect_metrics()
@@ -162,7 +161,7 @@ f1
 
 #DECISION TREE model
 tree_data<-data%>%select(-id,-X,-Bratio,-gender)
-tree_rec<-recipe(diagnosis~.,data = tree_data)%>% #before imputing, knn_data is unimputed
+tree_rec<-recipe(diagnosis~.,data = tree_data)%>% 
           step_string2factor(diagnosis)%>%prep()
 
 
@@ -177,7 +176,7 @@ tree_workflow <- workflow() %>%
   add_model(tree_model)
 
 tree_grid <- expand.grid(
-  tree_depth = seq(1, 20) # Specify the tree depth values to try
+  tree_depth = seq(1, 20)
 )
 
 metrics <- metric_set(accuracy, roc_auc)
@@ -187,14 +186,14 @@ tree_vfold<-vfold_cv(juice(tree_rec),v=5,strata = diagnosis)
 
 tree_tune <- tree_workflow %>%
   tune_grid(
-    resamples = tree_vfold, # Should've not used can_vfold, used juiced data of the can rec, different preprocessing
-    grid = tree_grid, # Specify the tuning grid
-    metrics = metrics, # Specify the evaluation metrics
-    control = control_grid(save_pred = TRUE) # Save predictions for evaluation
+    resamples = tree_vfold,
+    grid = tree_grid, 
+    metrics = metrics, 
+    control = control_grid(save_pred = TRUE) 
   ) %>%
   collect_metrics()
 
-tree_validation_accuracy<-tree_tune%>%filter(.metric=="accuracy")%>%filter(mean==max(mean))# 3 is the best depth,minimum.
+tree_validation_accuracy<-tree_tune%>%filter(.metric=="accuracy")%>%filter(mean==max(mean))
 tree_validation_roc<-tree_tune%>%filter(.metric=="roc_auc")%>%filter(mean==max(mean))
 tree_validation_f1<-tree_tune%>%filter(.metric=="f_meas")%>%filter(mean==max(mean))
 
@@ -212,7 +211,7 @@ tree_test_preprocessed <- bake(tree_test_rec, new_data = can_test)
 optimal_tree_fit<-optimal_tree_mod%>%fit(diagnosis~.,data = juice(tree_rec))
 tree_pred<-predict(optimal_tree_fit,new_data = tree_test_preprocessed )%>%bind_cols(can_test)
 
-tree_accuracy<-accuracy(test_pred,truth = diagnosis,estimate = .pred_class) #use tree_pred, not test pred
+tree_accuracy<-accuracy(tree_pred,truth = diagnosis,estimate = .pred_class) 
 
 
 tree_test_pred_prob<-predict(optimal_tree_fit,type = "prob" ,new_data = tree_test_preprocessed)%>%bind_cols(can_test)
